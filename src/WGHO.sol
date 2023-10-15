@@ -1,6 +1,7 @@
 pragma solidity ^0.8.13;
 
 import "./interfaces/IWGHO.sol";
+import "./interfaces/IGHO.sol";
 
 contract WGHO is IWGHO {
 
@@ -12,7 +13,7 @@ contract WGHO is IWGHO {
     uint256 public immutable deploymentChainId;
     uint256 public totalSupply;
     bytes32 private immutable _DOMAIN_SEPARATOR;
-    IERC20 public immutable GHO;
+    IGHO public immutable GHO;
 
     mapping (address => uint256) public override balanceOf;
 
@@ -33,7 +34,7 @@ contract WGHO is IWGHO {
     constructor(address ghoAddress) {
         _DOMAIN_SEPARATOR = _calculateDomainSeparator(block.chainid);
         deploymentChainId = block.chainid;
-        GHO = IERC20(ghoAddress);
+        GHO = IGHO(ghoAddress);
     }
 
     function _calculateDomainSeparator(uint256 chainId) internal view returns (bytes32) {
