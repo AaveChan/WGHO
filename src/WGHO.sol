@@ -36,7 +36,7 @@ contract WGHO is IWGHO {
         GHO = IERC20(ghoAddress);
     }
 
-    function _calculateDomainSeparator(uint256 chainId) private view returns (bytes32) {
+    function _calculateDomainSeparator(uint256 chainId) internal view returns (bytes32) {
         return keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
