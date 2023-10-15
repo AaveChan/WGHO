@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {WGHO} from "../src/WGHO.sol";
-import {GHO} from "../src/mocks/GHO.sol";
 import "../src/interfaces/IGHO.sol";
 
 contract WGHOTest is Test {
