@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "./interfaces/IWGHO.sol";
 import "./interfaces/IGHO.sol";
+import "@aave/AaveGovernanceV2.sol";
 
 contract WGHO is IWGHO {
 
@@ -33,6 +34,11 @@ contract WGHO is IWGHO {
     //@dev Permit errors
     error ExpiredPermit();
     error InvalidPermit();
+
+    modifier onlyRescueGuardian() {
+        if(msg.sender != whoCanRescue()) revert OnlyRescueGuardian();
+        _;
+    }
 
     constructor(address ghoAddress) {
         _DOMAIN_SEPARATOR = _calculateDomainSeparator(block.chainid);
@@ -162,5 +168,30 @@ contract WGHO is IWGHO {
         }
 
         return true;
+    }
+
+    /// @inheritdoc IRescuable
+    function emergencyTokenTransfer(
+        address erc20Token,
+        address to,
+        uint256 amount
+    ) external onlyRescueGuardian {
+        IERC20(erc20Token).transfer(to, amount);
+
+        emit ERC20Rescued(msg.sender, erc20Token, to, amount);
+    }
+
+    /// @inheritdoc IRescuable
+    function emergencyEtherTransfer(address to, uint256 amount) external onlyRescueGuardian {
+        (bool success, ) = to.call{value: amount}(new bytes(0));
+       
+        if(!success) revert EthRescueTransferFail();
+
+        emit NativeTokensRescued(msg.sender, to, amount);
+    }
+
+    /// @inheritdoc IRescuable
+    function whoCanRescue() public view virtual returns (address) {
+        return AaveGovernanceV2.SHORT_EXECUTOR;
     }
 }

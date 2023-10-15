@@ -1,1 +1,2 @@
 @openzeppelin/=lib/openzeppelin-contracts/contracts/
+@aave/=lib/aave-address-book/src/
