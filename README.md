@@ -1,7 +1,11 @@
 ## Wrapped GHO implementation
 
-TODO <3 :)
+Design decisions for the review:
 
+- Rescuable
+- Function unrolling
+- If you send wGHO to the wGHO contract you recive your GHO and the wGHO get burned
+- Permit
 
 Run tests with:
 
