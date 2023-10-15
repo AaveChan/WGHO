@@ -26,6 +26,8 @@ contract WGHO is IWGHO {
     error WithdrawAmountExceedsBalance();
     error TransferAmountExceedsBalance();
     error RequestExceedsAllowance();
+    error NotEnoughGHOBalance();
+    error NotEnoughGHOAllowance();
 
     //@dev Permit errors
     error ExpiredPermit();
@@ -54,9 +56,12 @@ contract WGHO is IWGHO {
     }
 
     function deposit(uint256 amount) external {
+        if(amount > GHO.balanceOf(msg.sender)) revert NotEnoughGHOBalance(); 
+        if(amount > GHO.allowance(msg.sender, address(this))) revert NotEnoughGHOAllowance();
         // _mintTo(msg.sender, amount);
         balanceOf[msg.sender] += amount;
         totalSupply += amount;
+
         GHO.transferFrom(msg.sender, address(this), amount);
         emit Transfer(address(0), msg.sender, amount);
     }
