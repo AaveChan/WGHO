@@ -10,7 +10,9 @@ contract WGHO is IWGHO {
 
     bytes32 public immutable PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     uint256 public immutable deploymentChainId;
+    uint256 public totalSupply;
     bytes32 private immutable _DOMAIN_SEPARATOR;
+    IERC20 public immutable GHO;
 
     mapping (address => uint256) public override balanceOf;
 
@@ -18,10 +20,9 @@ contract WGHO is IWGHO {
 
     mapping (address => mapping (address => uint256)) public override allowance;
 
-
     // Transfer errors
     error TransferFailed();
-    error BurnAmountExceedsBalance();
+    error WithdrawAmountExceedsBalance();
     error TransferAmountExceedsBalance();
     error RequestExceedsAllowance();
 
@@ -29,9 +30,10 @@ contract WGHO is IWGHO {
     error ExpiredPermit();
     error InvalidPermit();
 
-    constructor() {
+    constructor(address ghoAddress) {
         _DOMAIN_SEPARATOR = _calculateDomainSeparator(block.chainid);
         deploymentChainId = block.chainid;
+        GHO = IERC20(ghoAddress);
     }
 
     function _calculateDomainSeparator(uint256 chainId) private view returns (bytes32) {
@@ -50,37 +52,34 @@ contract WGHO is IWGHO {
         return block.chainid == deploymentChainId ? _DOMAIN_SEPARATOR : _calculateDomainSeparator(block.chainid);
     }
 
-    function totalSupply() external view override returns (uint256) {
-        return address(this).balance;
+    function deposit(uint256 amount) external {
+        // _mintTo(msg.sender, amount);
+        balanceOf[msg.sender] += amount;
+        totalSupply += amount;
+        GHO.transferFrom(msg.sender, address(this), amount);
+        emit Transfer(address(0), msg.sender, amount);
     }
 
-    function deposit() external payable {
-        // _mintTo(msg.sender, msg.value);
-        balanceOf[msg.sender] += msg.value;
-        emit Transfer(address(0), msg.sender, msg.value);
-    }
-
-   function withdraw(uint256 value) external {
-        // _burnFrom(msg.sender, value);
+   function withdraw(uint256 amount) external {
+        // _burnFrom(msg.sender, amount);
         uint256 balance = balanceOf[msg.sender];
-        if(balance < value) revert BurnAmountExceedsBalance();
-        balanceOf[msg.sender] = balance - value;
-        emit Transfer(msg.sender, address(0), value);
+        if(balance < amount) revert WithdrawAmountExceedsBalance();
+        balanceOf[msg.sender] = balance - amount;
+        totalSupply -= amount;
+        emit Transfer(msg.sender, address(0), amount);
 
-        // _transferEther(msg.sender, value);
-        (bool success, ) = msg.sender.call{value: value}("");
-        if(!success) revert TransferFailed();
+        GHO.transfer(msg.sender, amount);
     }
 
-   function approve(address spender, uint256 value) external override returns (bool) {
-        // _approve(msg.sender, spender, value);
-        allowance[msg.sender][spender] = value;
-        emit Approval(msg.sender, spender, value);
+   function approve(address spender, uint256 amount) external override returns (bool) {
+        // _approve(msg.sender, spender, amount);
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
 
         return true;
     }
 
-   function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override {
+   function permit(address owner, address spender, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override {
         if(block.timestamp > deadline) revert ExpiredPermit();
 
         bytes32 hashStruct = keccak256(
@@ -88,7 +87,7 @@ contract WGHO is IWGHO {
                 PERMIT_TYPEHASH,
                 owner,
                 spender,
-                value,
+                amount,
                 nonces[owner]++,
                 deadline));
 
@@ -100,61 +99,59 @@ contract WGHO is IWGHO {
 
         address signer = ecrecover(hash, v, r, s);
         if(signer != owner) revert InvalidPermit();
-        // _approve(owner, spender, value);
-        allowance[owner][spender] = value;
-        emit Approval(owner, spender, value);
+        // _approve(owner, spender, amount);
+        allowance[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
     }
 
-    function transfer(address to, uint256 value) external override returns (bool) {
-        // _transferFrom(msg.sender, to, value);
+    function transfer(address to, uint256 amount) external override returns (bool) {
+        // _transferFrom(msg.sender, to, amount);
         if (to != address(0) && to != address(this)) { // Transfer
             uint256 balance = balanceOf[msg.sender];
-            if(value > balance) revert TransferAmountExceedsBalance();
+            if(amount > balance) revert TransferAmountExceedsBalance();
 
-            balanceOf[msg.sender] = balance - value;
-            balanceOf[to] += value;
-            emit Transfer(msg.sender, to, value);
+            balanceOf[msg.sender] = balance - amount;
+            balanceOf[to] += amount;
+            emit Transfer(msg.sender, to, amount);
         } else { // Withdraw
             uint256 balance = balanceOf[msg.sender];
-            if(value > balance) revert BurnAmountExceedsBalance();
-            balanceOf[msg.sender] = balance - value;
-            emit Transfer(msg.sender, address(0), value);
-
-            (bool success, ) = msg.sender.call{value: value}("");
-            if(!success) revert TransferFailed();
+            if(amount > balance) revert WithdrawAmountExceedsBalance();
+            balanceOf[msg.sender] = balance - amount;
+            emit Transfer(msg.sender, address(0), amount);
+            totalSupply -= amount;
+            GHO.transfer(msg.sender, amount);
         }
 
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 value) external override returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
         if (from != msg.sender) {
-            // _decreaseAllowance(from, msg.sender, value);
+            // _decreaseAllowance(from, msg.sender, amount);
             uint256 allowed = allowance[from][msg.sender];
             if (allowed != type(uint256).max) {
-                if(value > allowed) revert RequestExceedsAllowance();
-                uint256 reduced = allowed - value;
+                if(amount > allowed) revert RequestExceedsAllowance();
+                uint256 reduced = allowed - amount;
                 allowance[from][msg.sender] = reduced;
                 emit Approval(from, msg.sender, reduced);
             }
         }
 
-        // _transferFrom(from, to, value);
+        // _transferFrom(from, to, amount);
         if (to != address(0) && to != address(this)) { // Transfer
             uint256 balance = balanceOf[from];
-            if(value > balance) revert TransferAmountExceedsBalance();
+            if(amount > balance) revert TransferAmountExceedsBalance();
 
-            balanceOf[from] = balance - value;
-            balanceOf[to] += value;
-            emit Transfer(from, to, value);
+            balanceOf[from] = balance - amount;
+            balanceOf[to] += amount;
+            emit Transfer(from, to, amount);
         } else { // Withdraw
             uint256 balance = balanceOf[from];
-            if(value > balance) revert BurnAmountExceedsBalance();
-            balanceOf[from] = balance - value;
-            emit Transfer(from, address(0), value);
-
-            (bool success, ) = msg.sender.call{value: value}("");
-            if(!success) revert TransferFailed();
+            if(amount > balance) revert WithdrawAmountExceedsBalance();
+            balanceOf[from] = balance - amount;
+            emit Transfer(from, address(0), amount);
+            totalSupply -= amount;
+            GHO.transfer(msg.sender, amount);
         }
 
         return true;
