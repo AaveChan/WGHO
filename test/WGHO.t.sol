@@ -32,12 +32,7 @@ contract WGHOTest is Test {
         assertEq(gho.balanceOf(alice), INITIAL_BALANCE);
         assertEq(gho.balanceOf(bob), INITIAL_BALANCE);
     }
-
-    /*
-        ERC20 Tests
-    */
     
-
     /*
         Deposit and withdraw tests
     */
@@ -140,7 +135,6 @@ contract WGHOTest is Test {
         wGHO.emergencyTokenTransfer(address(gho), recipient, 500e18);
     }
 
-
     /*
         Helper functions
     */
@@ -149,22 +143,4 @@ contract WGHOTest is Test {
         wGHO.deposit(amount);
     }
 
-    function _getPermitDigest(address owner, address spender, uint256 amount, uint256 deadline, uint256 nonce) internal view returns(bytes32) {
-        bytes32 hashStruct = keccak256(
-        abi.encode(
-            keccak256('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)'),
-            owner,
-            spender,
-            amount,
-            nonce,
-            deadline));
-
-        return keccak256(
-            abi.encodePacked(
-                '\x19\x01',
-                wGHO.DOMAIN_SEPARATOR(),
-                hashStruct
-            )
-        );
-    }
 }
