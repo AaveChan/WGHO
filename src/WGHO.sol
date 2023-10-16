@@ -64,8 +64,7 @@ contract WGHO is ERC20, ERC20Permit, Rescuable {
      * @param amount The amount of WGHO tokens to withdraw.
      */
     function withdraw(uint256 amount) external {
-        uint256 balance = balanceOf(msg.sender);
-        if (balance < amount) revert WithdrawAmountExceedsBalance();
+        if (balanceOf(msg.sender) < amount) revert WithdrawAmountExceedsBalance();
 
         _burn(msg.sender, amount);
 
