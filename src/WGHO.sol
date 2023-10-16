@@ -52,7 +52,6 @@ contract WGHO is ERC20, ERC20Permit, Rescuable {
         _mint(msg.sender, amount);
 
         GHO.transferFrom(msg.sender, address(this), amount);
-        emit Transfer(address(0), msg.sender, amount);
     }
 
     /**
@@ -67,8 +66,7 @@ contract WGHO is ERC20, ERC20Permit, Rescuable {
         if (balanceOf(msg.sender) < amount) revert WithdrawAmountExceedsBalance();
 
         _burn(msg.sender, amount);
-
-        emit Transfer(msg.sender, address(0), amount);
+        
         GHO.transfer(msg.sender, amount);
     }
 
