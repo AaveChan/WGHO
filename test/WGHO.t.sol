@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 import {Test, console2} from 'forge-std/Test.sol';
-import {ECDSA} from '@openzeppelin/utils/cryptography/ECDSA.sol';
 import {WGHO} from '../src/WGHO.sol';
 import '../src/interfaces/IGHO.sol';
 
@@ -32,7 +31,7 @@ contract WGHOTest is Test {
         assertEq(gho.balanceOf(alice), INITIAL_BALANCE);
         assertEq(gho.balanceOf(bob), INITIAL_BALANCE);
     }
-    
+
     /*
         Deposit and withdraw tests
     */
