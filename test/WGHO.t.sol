@@ -108,17 +108,32 @@ contract WGHOTest is Test {
         
         vm.startPrank(alice);
         gho.transfer(address(wGHO), 500e18);
+        _deposit(500e18); 
 
-        assertEq(gho.balanceOf(address(wGHO)), 500e18);
+        assertEq(gho.balanceOf(address(wGHO)), 1000e18);
+        assertEq(wGHO.totalSupply(), 500e18);
 
         address recipient = address(1230123519);
 
         vm.startPrank(wGHO.whoCanRescue());
         wGHO.emergencyTokenTransfer(address(gho), recipient, 500e18);
 
-        assertEq(gho.balanceOf(address(wGHO)), 0);
+        assertEq(gho.balanceOf(address(wGHO)), 500e18);
         assertEq(gho.balanceOf(recipient), 500e18);
+    }
+
+    function testEmergencyTokenTransferWithoutSupply() public {
         
+        vm.startPrank(alice);
+        gho.transfer(address(wGHO), 500e18);
+
+        assertEq(gho.balanceOf(address(wGHO)), 500e18);
+
+        address recipient = address(1230123519);
+
+        vm.startPrank(wGHO.whoCanRescue());
+        vm.expectRevert(abi.encodeWithSignature('NotEnoughGHOBalance()'));
+        wGHO.emergencyTokenTransfer(address(gho), recipient, 500e18);
     }
 
     function testEmergencyTokenTransferWhenNotOwner() public {
