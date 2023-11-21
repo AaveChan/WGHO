@@ -85,7 +85,7 @@ contract WGHOTest is Test {
 
         address recipient = address(1230123519);
 
-        vm.prank(wGHO.whoCanRescue());
+        vm.startPrank(wGHO.whoCanRescue());
         
         wGHO.emergencyEtherTransfer(recipient, 5 ether);
 
@@ -106,14 +106,14 @@ contract WGHOTest is Test {
 
     function testEmergencyTokenTransfer() public {
         
-        vm.prank(alice);
+        vm.startPrank(alice);
         gho.transfer(address(wGHO), 500e18);
 
         assertEq(gho.balanceOf(address(wGHO)), 500e18);
 
         address recipient = address(1230123519);
 
-        vm.prank(wGHO.whoCanRescue());
+        vm.startPrank(wGHO.whoCanRescue());
         wGHO.emergencyTokenTransfer(address(gho), recipient, 500e18);
 
         assertEq(gho.balanceOf(address(wGHO)), 0);
@@ -123,7 +123,7 @@ contract WGHOTest is Test {
 
     function testEmergencyTokenTransferWhenNotOwner() public {
 
-        vm.prank(alice);
+        vm.startPrank(alice);
         gho.transfer(address(wGHO), 500e18);
 
         assertEq(gho.balanceOf(address(wGHO)), 500e18);
