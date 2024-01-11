@@ -174,13 +174,15 @@ contract WGHOTest is Test {
             abi.encodePacked(
                 '\x19\x01',
                 gho.DOMAIN_SEPARATOR(),
-                abi.encode(
-                    keccak256('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)'),
-                    alice,
-                    address(wGHO),
-                    500e18,
-                    0,
-                    block.timestamp + 10
+                keccak256(
+                    abi.encode(
+                        keccak256('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)'),
+                        alice,
+                        address(wGHO),
+                        500e18,
+                        0,
+                        block.timestamp + 10
+                    )
                 )
             )
         );
@@ -222,10 +224,254 @@ contract WGHOTest is Test {
         vm.startPrank(alice);
 
         wGHO.metaDeposit(500e18, alice, block.timestamp + 10, permit, signature);
+
+        assertEq(wGHO.balanceOf(alice), 500e18);
+        assertEq(wGHO.totalSupply(), 500e18);
+        assertEq(gho.balanceOf(alice), INITIAL_BALANCE - 500e18);
     }
 
-    function testMetaWithdrawal() public {
+    function testMetaDepositWithInvalidPermit() public {
+        WGHO.PermitParams memory permit;
+        WGHO.SignatureParams memory signature;
+
+        // Prepare permit
+        bytes32 permitDigest = keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                gho.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        keccak256('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)'),
+                        alice,
+                        address(wGHO),
+                        500e18,
+                        1,
+                        block.timestamp + 10
+                    )
+                )
+            )
+        );
+
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(alice_pk, permitDigest);
+
+        permit.owner = alice;
+        permit.spender = address(wGHO);
+        permit.value = 500e18;
+        permit.deadline = block.timestamp + 10;
+        permit.v = v1;
+        permit.r = r1;
+        permit.s = s1;
+
+        // Prepare signature
+        bytes32 sigDigest = keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                wGHO.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        METADEPOSIT_TYPEHASH,
+                        500e18,
+                        alice,
+                        0,
+                        block.timestamp + 10,
+                        permit
+                    )
+                )
+            )
+        );
+
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(alice_pk, sigDigest);
+
+        signature.v = v2;
+        signature.r = r2;
+        signature.s = s2;
+
+        vm.startPrank(alice);
+
+        vm.expectRevert('INVALID_SIGNER');
+        wGHO.metaDeposit(500e18, alice, block.timestamp + 10, permit, signature);
         
+    }
+
+    function testMetaDepositWithInvalidSignature() public {
+        WGHO.PermitParams memory permit;
+        WGHO.SignatureParams memory signature;
+
+        // Prepare permit
+        bytes32 permitDigest = keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                gho.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        keccak256('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)'),
+                        alice,
+                        address(wGHO),
+                        500e18,
+                        0,
+                        block.timestamp + 10
+                    )
+                )
+            )
+        );
+
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(bob_pk, permitDigest);
+
+        permit.owner = alice;
+        permit.spender = address(wGHO);
+        permit.value = 500e18;
+        permit.deadline = block.timestamp + 10;
+        permit.v = v1;
+        permit.r = r1;
+        permit.s = s1;
+
+        // Prepare signature
+        bytes32 sigDigest = keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                wGHO.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        METADEPOSIT_TYPEHASH,
+                        500e18,
+                        alice,
+                        0,
+                        block.timestamp + 10,
+                        permit
+                    )
+                )
+            )
+        );
+
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(alice_pk, sigDigest);
+
+        signature.v = v2;
+        signature.r = r2;
+        signature.s = s2;
+
+        vm.startPrank(alice);
+
+        vm.expectRevert('INVALID_SIGNER');
+        wGHO.metaDeposit(500e18, alice, block.timestamp + 10, permit, signature);
+    }
+
+
+    function testMetaWithdrawal() public {
+
+        vm.startPrank(alice);
+        _deposit(500e18);
+        WGHO.SignatureParams memory signature;
+
+        // Prepare signature
+        bytes32 sigDigest = keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                wGHO.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        METAWITHDRAWAL_TYPEHASH,
+                        500e18,
+                        alice,
+                        0,
+                        block.timestamp + 10
+                    )
+                )
+            )
+        );
+
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(alice_pk, sigDigest);
+
+        signature.v = v2;
+        signature.r = r2;
+        signature.s = s2;
+
+        vm.startPrank(bob);
+        wGHO.metaWithdraw(500e18, alice, block.timestamp + 10, signature);
+
+        assertEq(gho.balanceOf(alice), INITIAL_BALANCE);
+        assertEq(wGHO.balanceOf(alice), 0);
+    }
+
+    function testMetaWithdrawalInvalidAddress() public {
+        WGHO.SignatureParams memory signature;
+
+        vm.expectRevert(abi.encodeWithSignature('InvalidAddress()'));
+        wGHO.metaWithdraw(500e18, address(0), block.timestamp + 10, signature);
+    }
+
+    function testMetaWithdrawalWithInvalidDeadline() public {
+        WGHO.SignatureParams memory signature;
+
+        vm.expectRevert(abi.encodeWithSignature('InvalidDeadline()'));
+        wGHO.metaWithdraw(500e18, alice, block.timestamp - 10, signature);
+    } 
+    
+    function testMetaWithdrawalWithoutDeposit() public {
+        WGHO.SignatureParams memory signature;
+
+        // Prepare signature
+        bytes32 sigDigest = keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                wGHO.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        METAWITHDRAWAL_TYPEHASH,
+                        500e18,
+                        alice,
+                        0,
+                        block.timestamp + 10
+                    )
+                )
+            )
+        );
+
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(alice_pk, sigDigest);
+
+        signature.v = v2;
+        signature.r = r2;
+        signature.s = s2;
+
+        vm.startPrank(bob);
+        
+        vm.expectRevert(abi.encodeWithSignature('WithdrawAmountExceedsBalance()'));
+        wGHO.metaWithdraw(500e18, alice, block.timestamp + 10, signature); 
+    }
+
+    function testMetaWithdrawalWithInvalidSignature() public {
+
+        vm.startPrank(alice);
+        _deposit(500e18);
+
+        WGHO.SignatureParams memory signature;
+
+        // Prepare signature
+        bytes32 sigDigest = keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                wGHO.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        METAWITHDRAWAL_TYPEHASH,
+                        500e18,
+                        alice,
+                        1,
+                        block.timestamp + 10
+                    )
+                )
+            )
+        );
+
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(alice_pk, sigDigest);
+
+        signature.v = v2;
+        signature.r = r2;
+        signature.s = s2;
+
+        vm.startPrank(bob);
+
+        vm.expectRevert(abi.encodeWithSignature('InvalidSignature()'));
+        wGHO.metaWithdraw(500e18, alice, block.timestamp + 10, signature);
     }
 
     /*

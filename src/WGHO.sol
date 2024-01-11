@@ -1,6 +1,7 @@
 pragma solidity ^0.8.13;
 
 import {Rescuable, IERC20} from '@bgd/utils/Rescuable.sol';
+import {IRescuable} from '@bgd/utils/interfaces/IRescuable.sol';
 import {SafeERC20} from '@bgd/oz-common/SafeERC20.sol';
 import {ERC20} from '@openzeppelin/token/ERC20/ERC20.sol';
 import {Ownable} from '@openzeppelin/access/Ownable.sol';
@@ -8,35 +9,20 @@ import {ERC20Permit} from '@openzeppelin/token/ERC20/extensions/ERC20Permit.sol'
 import {IERC20Permit} from '@openzeppelin/token/ERC20/extensions/IERC20Permit.sol';
 import {AaveGovernanceV2} from '@aave/AaveGovernanceV2.sol';
 import './interfaces/IGHO.sol';
+import {IWGHO} from './interfaces/IWGHO.sol';
 
 /**
  * @title Wrapped GHO (WGHO) Token
  *
  * @notice This contract represents Wrapped GHO (WGHO), which wraps GHO tokens to make them compatible with other systems.
- * It is an ERC20 token with permit support and implements a rescue mechanism.
+ * It is an ERC20 token with permit support and implements a rescue mechanism and some meta function capabilities.
  *
  * @dev The contract is based on the OpenZeppelin ERC20 and ERC20Permit standards, with additional functionality.
  */
-contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable {
+contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable, IWGHO {
 
     using SafeERC20 for IERC20;
 
-    struct SignatureParams {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
-    struct PermitParams {
-        address owner;
-        address spender;
-        uint256 value;
-        uint256 deadline;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-    
     /// @dev Typehash of the deposit function
     bytes32 public constant METADEPOSIT_TYPEHASH = keccak256(
         'Deposit(uint256 amount,address depositor,uint256 nonce,uint256 deadline,PermitParams permit)'
@@ -77,15 +63,7 @@ contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable {
         rescueAddress = AaveGovernanceV2.SHORT_EXECUTOR;
     }
 
-    /**
-     * @dev Deposit GHO tokens to receive WGHO tokens.
-     *
-     * Requirements:
-     * - The caller must have a GHO balance greater than or equal to the deposit amount.
-     * - The caller must have approved this contract to spend their GHO tokens.
-     *
-     * @param amount The amount of GHO tokens to deposit.
-     */
+    //@inheritdoc IWGHO
     function deposit(uint256 amount) external {
         if (amount > GHO.balanceOf(msg.sender)) revert NotEnoughGHOBalance();
         if (amount > GHO.allowance(msg.sender, address(this))) revert NotEnoughGHOAllowance();
@@ -95,6 +73,7 @@ contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable {
         GHO.transferFrom(msg.sender, address(this), amount);
     }
 
+    //@inheritdoc IWGHO
     function metaDeposit(
         uint256 amount,
         address depositor,
@@ -149,14 +128,7 @@ contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable {
         GHO.transferFrom(depositor, address(this), amount);
     }
 
-    /**
-     * @dev Withdraw WGHO tokens to receive GHO tokens.
-     *
-     * Requirements:
-     * - The caller must have a balance of WGHO tokens greater than or equal to the withdrawal amount.
-     *
-     * @param amount The amount of WGHO tokens to withdraw.
-     */ 
+    //@inheritdoc IWGHO
     function withdraw(uint256 amount) external {
         if (balanceOf(msg.sender) < amount) revert WithdrawAmountExceedsBalance();
 
@@ -165,11 +137,11 @@ contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable {
         GHO.transfer(msg.sender, amount);
     }
 
+    //@inheritdoc IWGHO
     function metaWithdraw(
         uint256 amount,
         address depositor,
         uint256 deadline,
-        PermitParams calldata permitParams,
         SignatureParams calldata sig
     ) external {
         if(depositor == address(0)) revert InvalidAddress();
@@ -191,8 +163,7 @@ contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable {
                             amount,
                             depositor,
                             nonce,
-                            deadline,
-                            permitParams
+                            deadline
                         )
                     )
                 )
@@ -207,34 +178,30 @@ contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable {
         GHO.transfer(depositor, amount);
     }
 
-    /**
-     * @dev Returns the address that can initiate rescue operations.
-     *
-     * @return The address that can execute rescue operations (AaveGovernanceV2.SHORT_EXECUTOR).
-     */
-    function whoCanRescue() public view override returns (address) {
-        return rescueAddress;
+    //@inheritdoc IRescuable
+    function whoCanRescue() public view override(Rescuable, IRescuable) returns (address) {
+        return owner();
     }
 
-    /**
-     * @dev Changes the address that can initiate rescue operations
-     */
-    function changeWhoCanRescue(address _rescueAddress) public onlyOwner() {
-        rescueAddress = _rescueAddress;
-    }
-
-    //@inheritdoc 
+    //@inheritdoc IRescuable 
     function emergencyTokenTransfer(
         address erc20Token,
         address to,
         uint256 amount
-    ) external override onlyRescueGuardian {
+    ) external override(Rescuable, IRescuable) onlyRescueGuardian {
 
         if(erc20Token == address(GHO) && amount > totalSupply()) revert NotEnoughGHOBalance();
 
         IERC20(erc20Token).safeTransfer(to, amount);
 
         emit ERC20Rescued(msg.sender, erc20Token, to, amount);
+    }
+
+    /**
+     * @inheritdoc IERC20Permit
+     */
+    function nonces(address owner) public view override(ERC20Permit, IERC20Permit) returns(uint256){
+       return super.nonces(owner);
     }
     
 }
