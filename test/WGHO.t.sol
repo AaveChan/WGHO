@@ -6,6 +6,7 @@ import {WGHO} from '../src/WGHO.sol';
 import '../src/interfaces/IGHO.sol';
 
 contract WGHOTest is Test {
+
     WGHO public wGHO;
     IGHO public gho;
 
@@ -17,9 +18,17 @@ contract WGHOTest is Test {
     address internal alice = vm.addr(alice_pk);
     address internal bob = vm.addr(bob_pk);
 
+    bytes32 public constant METADEPOSIT_TYPEHASH = keccak256(
+        'Deposit(uint256 amount,address depositor,uint256 nonce,uint256 deadline,PermitParams permit)'
+    );
+
+    bytes32 public constant METAWITHDRAWAL_TYPEHASH = keccak256(
+        'Withdraw(uint256 amount,address depositor,uint256 nonce,uint256 deadline,PermitParams permit)'
+    );
+
     function setUp() public {
         gho = IGHO(0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f); // GHO ADDRESS MAINNET
-        wGHO = new WGHO(address(gho));
+        wGHO = new WGHO(address(gho), address(this));
 
         /*
             Impersonate GHO facilitator to mint GHO
@@ -149,6 +158,76 @@ contract WGHOTest is Test {
         wGHO.emergencyTokenTransfer(address(gho), recipient, 500e18);
     }
 
+
+    /*
+        testMetaDeposit:
+        with permit
+        with invalid digest
+        without permit
+    */
+    function testMetaDeposit() public {
+        WGHO.PermitParams memory permit;
+        WGHO.SignatureParams memory signature;
+
+        // Prepare permit
+        bytes32 permitDigest = keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                gho.DOMAIN_SEPARATOR(),
+                abi.encode(
+                    keccak256('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)'),
+                    alice,
+                    address(wGHO),
+                    500e18,
+                    0,
+                    block.timestamp + 10
+                )
+            )
+        );
+
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(alice_pk, permitDigest);
+
+        permit.owner = alice;
+        permit.spender = address(wGHO);
+        permit.value = 500e18;
+        permit.deadline = block.timestamp + 10;
+        permit.v = v1;
+        permit.r = r1;
+        permit.s = s1;
+
+        // Prepare signature
+        bytes32 sigDigest = keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                wGHO.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        METADEPOSIT_TYPEHASH,
+                        500e18,
+                        alice,
+                        0,
+                        block.timestamp + 10,
+                        permit
+                    )
+                )
+            )
+        );
+
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(alice_pk, sigDigest);
+
+        signature.v = v2;
+        signature.r = r2;
+        signature.s = s2;
+
+        vm.startPrank(alice);
+
+        wGHO.metaDeposit(500e18, alice, block.timestamp + 10, permit, signature);
+    }
+
+    function testMetaWithdrawal() public {
+        
+    }
+
     /*
         Helper functions
     */
@@ -157,4 +236,22 @@ contract WGHOTest is Test {
         wGHO.deposit(amount);
     }
 
+    function _getPermitDigest(address owner, address spender, uint256 amount, uint256 deadline, uint256 nonce) internal view returns(bytes32) {
+        bytes32 hashStruct = keccak256(
+        abi.encode(
+            keccak256('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)'),
+            owner,
+            spender,
+            amount,
+            nonce,
+            deadline));
+
+        return keccak256(
+            abi.encodePacked(
+                '\x19\x01',
+                wGHO.DOMAIN_SEPARATOR(),
+                hashStruct
+            )
+        );
+    }
 }

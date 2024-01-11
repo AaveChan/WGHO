@@ -11,15 +11,47 @@ import '@bgd/utils/interfaces/IRescuable.sol';
  */
 interface IWGHO is IERC20, IERC2612, IRescuable {
 
+    struct SignatureParams {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
+    struct PermitParams {
+        address owner;
+        address spender;
+        uint256 value;
+        uint256 deadline;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
     /**
      * @dev Deposit GHO tokens to receive WGHO tokens.
      * @param amount The amount of GHO tokens to deposit.
      */
     function deposit(uint256 amount) external;
 
+    function metaDeposit(
+        uint256 amount,
+        address depositor,
+        uint256 deadline,
+        PermitParams calldata permitParams,
+        SignatureParams calldata sig
+    ) external;
+
     /**
      * @dev Withdraw WGHO tokens to receive GHO tokens.
      * @param amount The amount of WGHO tokens to withdraw.
      */
     function withdraw(uint256 amount) external;
+
+    function metaWithdraw(
+        uint256 amount,
+        address depositor,
+        uint256 deadline,
+        PermitParams calldata permitParams,
+        SignatureParams calldata sig
+    ) external;
 }
