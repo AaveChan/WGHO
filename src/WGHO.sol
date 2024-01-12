@@ -33,9 +33,6 @@ contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable, IWGHO {
         'Withdraw(uint256 amount,address depositor,uint256 nonce,uint256 deadline,PermitParams permit)'
     );
 
-    // @dev Address that will be able to call the rescue
-    address rescueAddress;
-
     /// @dev The original GHO token contract
     IGHO public immutable GHO;
 
@@ -60,7 +57,6 @@ contract WGHO is ERC20, ERC20Permit, Rescuable, Ownable, IWGHO {
      */
     constructor(address ghoAddress, address owner) ERC20('Wrapped GHO', 'WGHO') ERC20Permit('WGHO') Ownable(owner) {
         GHO = IGHO(ghoAddress);
-        rescueAddress = AaveGovernanceV2.SHORT_EXECUTOR;
     }
 
     //@inheritdoc IWGHO
